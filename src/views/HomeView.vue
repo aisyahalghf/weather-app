@@ -1,18 +1,169 @@
 <template>
-  <div class="home">
-    <img alt="Vue logo" src="../assets/logo.png" />
-    <HelloWorld msg="Welcome to Your Vue.js App" />
+  <div>
+    <AlertError v-if="errorMessage" :msg="errorMessage" />
+    <div
+      :class="{
+        'bg-storm': dataWeather?.type === 'Thunderstorm',
+        'bg-cloudy': dataWeather?.type === 'Clouds',
+        'bg-clear': dataWeather?.type === 'Clear',
+        'bg-snow': dataWeather?.type === 'Snow',
+        'bg-mist': dataWeather?.type === 'Atmosphere',
+        'bg-rain':
+          dataWeather?.type === 'Rain' || dataWeather?.type === 'Drizzle',
+      }"
+      class="bg-no-repeat bg-cover min-h-screen py-10 flex flex-col gap-4 text-white font-semibold text-4xl items-center"
+    >
+      <h1>{{ dataWeather.location }}</h1>
+      <h1 class="text-6xl">{{ dataWeather.temp.toFixed() }}&#176;</h1>
+      <div class="mb-5">
+        <div class="flex justify-center items-center">
+          <h1 class="text-2xl">{{ dataWeather.type }}</h1>
+          <img class="w-10 h-[100%]" alt="icon" :src="dataWeather?.icon" />
+        </div>
+        <h1 class="text-2xl">{{ dataWeather.description }}</h1>
+        <div class="flex gap-5 text-2xl justify-center">
+          <p>H:{{ dataWeather.maxTemp.toFixed() }}&#176;</p>
+          <p>L:{{ dataWeather.minTemp.toFixed() }}&#176;</p>
+        </div>
+      </div>
+      <div class="flex gap-10 justify-center flex-wrap mt-20">
+        <CardSunrise
+          :sunrise="dataWeather.sunrise"
+          :sunset="dataWeather.sunset"
+        />
+        <CardTemplate
+          heading="WIND"
+          iconName="solar:wind-bold"
+          :temp="dataWeather.wind.toFixed(1)"
+          :description="
+            dataWeather.wind.toFixed(1) < 25
+              ? `You can carry out your activities safely.`
+              : `Outdoor activities may be very dangerous`
+          "
+        />
+        <CardTemplate
+          heading="FEELS LIKE"
+          iconName="carbon:temperature-max"
+          :temp="dataWeather.feelLike.toFixed() + `&#176;`"
+          :description="
+            dataWeather.temp > dataWeather.feelLike
+              ? `Humidity feel coller.`
+              : `Humidity is making feel warmer. `
+          "
+        />
+        <CardTemplate
+          heading="HUMIDITY"
+          iconName="material-symbols-light:humidity-percentage-outline"
+          :temp="dataWeather.humidity"
+          description="The dew point is 19 right now"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
-// @ is an alias to /src
-import HelloWorld from "@/components/HelloWorld.vue";
-
+import CardSunrise from "@/components/CardSunrise.vue";
+import CardTemplate from "@/components/CardTemplate";
+import AlertError from "@/components/AlertError";
 export default {
   name: "HomeView",
   components: {
-    HelloWorld,
+    CardSunrise,
+    CardTemplate,
+    AlertError,
+  },
+
+  data() {
+    return {
+      errorMessage: "",
+      background: "",
+      apiKey: process.env.VUE_APP_WEATHER_API_KEY,
+      googleApiKey: process.env.VUE_APP_GOOGLE_MAPS_API_KEY,
+      dataWeather: {
+        location: "-",
+        type: "-",
+        description: "-",
+        icon: "",
+        maxTemp: 0,
+        minTemp: 0,
+        temp: 0,
+        sunrise: "-",
+        sunset: "-",
+        feelLike: 0,
+        humidity: 0,
+        wind: 0,
+      },
+    };
+  },
+  mounted() {
+    this.getLocation();
+  },
+  methods: {
+    getLocation() {
+      if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          this.handleSuccess,
+          this.handleError
+        );
+      } else {
+        console.log("Geolokasi tidak didukung di perangkat ini");
+      }
+    },
+
+    async handleSuccess(position) {
+      try {
+        const lat = position.coords.latitude;
+        const long = position.coords.longitude;
+        const response = await fetch(
+          `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${long}&appid=${this.apiKey}`
+        );
+        if (!response.ok) {
+          throw new Error("Network response was not ok.");
+        }
+        const data = await response.json();
+        this.dataWeather = {
+          location: data.name,
+          type: data.weather[0].main,
+          icon: `https://openweathermap.org/img/wn/${data.weather[0].icon}@2x.png`,
+          description: data.weather[0].description,
+          maxTemp: data?.main?.temp_max - 273.15,
+          minTemp: data?.main?.temp_min - 273.15,
+          temp: data.main.temp - 273.15,
+          sunrise: this.convertTime(data.sys.sunrise),
+          sunset: this.convertTime(data.sys.sunset),
+          feelLike: data.main.feels_like - 273.15,
+          humidity: data?.main?.humidity + "%",
+          wind: data.wind.speed * 3.6,
+        };
+        this.background = this.backgroundImage(data.weather[0].main);
+      } catch (error) {
+        this.errorMessage = "Internal Server Error";
+      }
+      this.errorMessage = "";
+    },
+    convertTime(time) {
+      const date = new Date(time * 1000);
+      const hours = date.getHours().toString().padStart(2, "0");
+      const minutes = date.getMinutes().toString().padStart(2, "0");
+      return `${hours}:${minutes}`;
+    },
+    handleError(error) {
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          this.errorMessage = "User denied the request for geolocation.";
+          break;
+        case error.POSITION_UNAVAILABLE:
+          this.errorMessage = "Location information is unavailable.";
+          break;
+        case error.TIMEOUT:
+          this.errorMessage = "The request to get user location timed out.";
+          break;
+        case error.UNKNOWN_ERROR:
+          this.errorMessage = "An unknown error occurred.";
+          break;
+      }
+    },
   },
 };
 </script>
