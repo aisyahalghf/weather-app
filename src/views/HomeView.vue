@@ -1,5 +1,8 @@
 <template>
-  <div>
+  <div
+    :class="{ 'bg-clear': dataWeather?.type === '-' }"
+    class="bg-no-repeat bg-cover min-h-screen"
+  >
     <AlertError v-if="errorMessage" :msg="errorMessage" />
     <div
       :class="{
@@ -11,6 +14,7 @@
         'bg-rain':
           dataWeather?.type === 'Rain' || dataWeather?.type === 'Drizzle',
       }"
+      v-if="dataWeather.icon"
       class="bg-no-repeat bg-cover min-h-screen py-10 flex flex-col gap-4 text-white font-semibold text-4xl items-center"
     >
       <h1>{{ dataWeather.location }}</h1>
@@ -18,7 +22,7 @@
       <div class="mb-5">
         <div class="flex justify-center items-center">
           <h1 class="text-2xl">{{ dataWeather.type }}</h1>
-          <img class="w-10 h-[100%]" alt="icon" :src="dataWeather?.icon" />
+          <img class="w-10 h-[100%]" alt="icon" :src="dataWeather.icon" />
         </div>
         <h1 class="text-2xl">{{ dataWeather.description }}</h1>
         <div class="flex gap-5 text-2xl justify-center">
@@ -101,7 +105,7 @@ export default {
   },
   methods: {
     getLocation() {
-      if ("geolocation" in navigator) {
+      if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           this.handleSuccess,
           this.handleError
