@@ -15,16 +15,16 @@
           dataWeather?.type === 'Rain' || dataWeather?.type === 'Drizzle',
       }"
       v-if="dataWeather.icon"
-      class="bg-no-repeat bg-cover min-h-screen py-10 flex flex-col gap-4 text-white font-semibold text-4xl items-center"
+      class="bg-no-repeat bg-cover min-h-screen py-10 flex flex-col gap-4 text-white font-semibold text-5xl items-center"
     >
       <h1>{{ dataWeather.location }}</h1>
-      <h1 class="text-6xl">{{ dataWeather.temp.toFixed() }}&#176;</h1>
+      <h1 class="text-7xl">{{ dataWeather.temp.toFixed() }}&#176;</h1>
       <div class="mb-5">
         <div class="flex justify-center items-center">
-          <h1 class="text-2xl">{{ dataWeather.type }}</h1>
-          <img class="w-10 h-[100%]" alt="icon" :src="dataWeather.icon" />
+          <h1 class="text-4xl font-extrabold">{{ dataWeather.type }}</h1>
+          <img class="w-16 h-[100%]" alt="icon" :src="dataWeather.icon" />
         </div>
-        <h1 class="text-2xl">{{ dataWeather.description }}</h1>
+        <h1 class="text-3xl capitalize">{{ dataWeather.description }}</h1>
         <div class="flex gap-5 text-2xl justify-center">
           <p>H:{{ dataWeather.maxTemp.toFixed() }}&#176;</p>
           <p>L:{{ dataWeather.minTemp.toFixed() }}&#176;</p>
@@ -59,7 +59,11 @@
           heading="HUMIDITY"
           iconName="material-symbols-light:humidity-percentage-outline"
           :temp="dataWeather.humidity"
-          description="The dew point is 19 right now"
+          :description="
+            dataWeather.humidity >= 30 && dataWeather.humidity <= 60
+              ? `Ideal Humidity Level`
+              : `Less than ideal humidity levels`
+          "
         />
       </div>
     </div>
@@ -81,46 +85,37 @@ export default {
   data() {
     return {
       errorMessage: "",
-      background: "",
-      apiKey: process.env.VUE_APP_WEATHER_API_KEY,
-      googleApiKey: process.env.VUE_APP_GOOGLE_MAPS_API_KEY,
-      dataWeather: {
-        location: "-",
-        type: "-",
-        description: "-",
-        icon: "",
-        maxTemp: 0,
-        minTemp: 0,
-        temp: 0,
-        sunrise: "-",
-        sunset: "-",
-        feelLike: 0,
-        humidity: 0,
-        wind: 0,
-      },
+      dataWeather: {},
     };
   },
   mounted() {
-    this.getLocation();
+    this.askPermit();
   },
   methods: {
     getLocation() {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          this.handleSuccess,
-          this.handleError
-        );
-      } else {
-        console.log("Geolokasi tidak didukung di perangkat ini");
-      }
+      const apiKey = process.env.VUE_APP_GOOGLE_MAPS_API_KEY;
+      fetch(
+        `https://www.googleapis.com/geolocation/v1/geolocate?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({}),
+        }
+      )
+        .then((response) => response.json())
+        .then((data) => this.handleSuccess(data.location))
+        .catch((error) => console.log(error));
     },
 
     async handleSuccess(position) {
       try {
-        const lat = position.coords.latitude;
-        const long = position.coords.longitude;
+        const apiKey = process.env.VUE_APP_WEATHER_API_KEY;
+        const lat = position.lat;
+        const long = position.lng;
         const response = await fetch(
-          `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${long}&appid=${this.apiKey}`
+          `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${long}&appid=${apiKey}`
         );
         if (!response.ok) {
           throw new Error("Network response was not ok.");
@@ -151,6 +146,16 @@ export default {
       const hours = date.getHours().toString().padStart(2, "0");
       const minutes = date.getMinutes().toString().padStart(2, "0");
       return `${hours}:${minutes}`;
+    },
+    askPermit() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          this.getLocation,
+          this.handleError
+        );
+      } else {
+        this.errorMessage = "Geolokasi tidak didukung di perangkat ini";
+      }
     },
     handleError(error) {
       switch (error.code) {
